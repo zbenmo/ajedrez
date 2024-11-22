@@ -19,6 +19,9 @@ class Piece(ABC):
             self, get_square_status: GetSquareStatus) -> Generator[Square, None, None]:
         pass
 
+    def __repr__(self):
+        return self.piece
+
 
 class Pawn(Piece):
     def __init__(self, location: Square, piece: str):
@@ -41,7 +44,8 @@ class Pawn(Piece):
             if get_square_status(move) == ' ':
                 yield move
         for capture in self.captures:
-            if get_square_status(move).islower() != self.piece.islower():
+            status = get_square_status(move) 
+            if status != ' ' and get_square_status(move).islower() != self.piece.islower():
                 yield capture
 
 
@@ -167,13 +171,12 @@ class Game:
 
 @dataclass
 class Board:
-    position: str # first part of fen
     turn: str # should be either 'w' or 'b'
     casteling: str # options still available
     en_passant: str
     half_moves: int
     move_number: int
-    stats: Counter # how many of each piece are there. There might be some extra stuff there
+    stats: Dict[str, int] # how many of each piece are there. There might be some extra stuff there
     piece_placement: 'np.array'
     location_to_piece: Dict[Square, Piece]
 
@@ -198,7 +201,29 @@ default_fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 
 
 class Game:
-    def __init__(self, fen: str = default_fen):
+    def __init__(self,
+        turn: str,
+        casteling: str,
+        en_passant: str,
+        half_moves: int,
+        move_number: int,
+        stats: Dict[str, int],
+        piece_placement: 'np.array',
+        location_to_piece: Dict[Square, Piece]
+        ):
+        self.board = Board(
+            turn=turn,
+            casteling=casteling,
+            en_passant=en_passant,
+            half_moves=int(half_moves),
+            move_number=int(move_number),
+            stats=stats,
+            piece_placement=piece_placement,
+            location_to_piece=location_to_piece
+        )
+
+    @classmethod
+    def from_fen(cls, fen: str = default_fen):
         (
             position,
             turn,
@@ -235,10 +260,9 @@ class Game:
                 case 'q' | 'Q':
                     return Queen((row, col), piece)
                 case 'k' | 'K':
-                    return Queen((row, col), piece)
+                    return King((row, col), piece)
 
-        self.board = Board(
-            position=position,
+        return cls(
             turn=turn,
             casteling=casteling,
             en_passant=en_passant,
@@ -255,8 +279,32 @@ class Game:
         )
 
     def available_moves(self) -> Generator[Tuple[str, Game], None, None]:
+        other = "w" if self.board.turn == "b" else "b"
+        next_move_number = self.board.move_number if other == "b" else self.board.move_number + 1
         for move in self._raw_moves():
-            yield f'{move}', self # TODO: TEMP
+            stats = self.board.stats.copy()
+            piece_placement = np.copy(self.board.piece_placement)
+            location_to_piece = self.board.location_to_piece.copy()
+            row_from, col_from, row_to, col_to, piece = move
+            status_dest = self.board.piece_placement[row_to, col_to]
+            if status_dest != ' ':
+                stats[status_dest] -= 1
+            location_to_piece[row_to, col_to] = location_to_piece[row_from, col_from] # potentially override
+            status_src = self.board.piece_placement[row_from, col_from]
+            del location_to_piece[row_from, col_from] # the piece is already in its new place
+            piece_placement[row_from, col_from] = ' '
+            piece_placement[row_to, col_to] = status_src
+            g = Game(
+                other,
+                self.board.casteling,
+                self.board.en_passant,
+                self.board.half_moves,
+                next_move_number,
+                stats,
+                piece_placement,
+                location_to_piece,
+            )
+            yield f'{move}', g
 
     def _raw_moves(self) -> Generator[Tuple[int, int, int, int, str], None, None]:
         for r, c, p in self.__current_player_pieces():
@@ -271,7 +319,7 @@ class Game:
             else ['P', 'R', 'N', 'B', 'Q', 'K']
         )
         for r, c in zip(*np.where(np.isin(self.board.piece_placement, relevant_pieces))):
-            yield r, c, self.board.piece_placement[r, c]
+            yield r.item(), c.item(), self.board.piece_placement[r, c].item()
 
     def __repr__(self):
         return f"""{self.board}"""
