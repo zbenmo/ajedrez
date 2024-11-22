@@ -309,10 +309,26 @@ class Game:
                 stats[piece] -= 1
                 stats[promotion] += 1
 
+            # en - passant
+            if (status_dest == ' ') and (piece == 'p' or piece == 'P') and (col_from != col_to):
+                target_row = row_to + 1 if piece == 'p' else row_to - 1
+                status_dest = self.board.piece_placement[target_row, col_to]
+                assert status_dest == 'p' or status_dest == 'P'
+                stats[status_dest] -= 1
+                del location_to_piece[target_row, col_to]
+
+            en_passant = '-'
+            if (
+                (piece == 'p' and (row_from == 1) and (row_to == 3))
+                or
+                (piece == 'P' and (row_from == 6) and (row_to == 4))
+                ):
+                en_passant = chr(ord('a') + col_from)
+
             g = Game(
                 other,
                 self.board.casteling,
-                self.board.en_passant,
+                en_passant,
                 self.board.half_moves,
                 next_move_number,
                 stats,
@@ -343,8 +359,24 @@ class Game:
 
     def _raw_moves(self, player: str) -> Generator[Tuple[int, int, int, int, str, str], None, None]:
         for r, c, p in self.__current_player_pieces(player):
-            piece = self.board.location_to_piece[r, c]
-            for dest in piece.theoretical_moves(lambda square: self.board.piece_placement[square]):
+            piece: Piece = self.board.location_to_piece[r, c]
+
+            # a bit logic for en-passant, if relevant, pretend you have there a Pawn
+            magic_square = None # for en-passant
+            if self.board.en_passant != '-' and isinstance(piece, Pawn):
+                # above isinstance(piece, Pawn) is redundant yet added for clarity
+                en_passant = ord(self.board.en_passant) - ord('a')
+                if c != en_passant: # if it is exactly in the current column, we don't want to "add" it
+                    if p == 'p':
+                        magic_square = (5, en_passant)
+                        magic_piece = 'P'
+                    elif p == 'P':
+                        magic_square = (2, en_passant)
+                        magic_piece = 'p'
+
+            for dest in piece.theoretical_moves(
+                lambda square: magic_piece if square == magic_square else self.board.piece_placement[square]
+                ):
                 # offering options for promotion is done here, if relevant
                 if p == 'p' and dest[0] == 7:
                     for promotion in ['q', 'r', 'b', 'n']:
