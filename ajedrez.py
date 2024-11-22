@@ -347,10 +347,10 @@ class Game:
             piece = self.board.location_to_piece[r, c]
             for dest in piece.theoretical_moves(lambda square: self.board.piece_placement[square]):
                 # offering options for promotion is done here, if relevant
-                if p == 'p' and dest[1] == 7:
+                if p == 'p' and dest[0] == 7:
                     for promotion in ['q', 'r', 'b', 'n']:
                         yield r, c, *dest, p, promotion
-                elif p == 'P' and dest[1] == 0:
+                elif p == 'P' and dest[0] == 0:
                     for promotion in ['Q', 'R', 'B', 'N']:
                         yield r, c, *dest, p, promotion
                 else:
