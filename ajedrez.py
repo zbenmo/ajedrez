@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Dict, Generator, Protocol, Tuple, Callable
+from typing import Dict, Generator, Tuple, Callable
 from collections import Counter
 import numpy as np
 
@@ -10,6 +10,7 @@ GetSquareStatus = Callable[[Square], str]
 
 
 class Piece(ABC):
+    """"""
     def __init__(self, location: Square, piece: str):
         self.location = location
         self.piece = piece
@@ -24,6 +25,7 @@ class Piece(ABC):
 
 
 class Pawn(Piece):
+    """"""
     def __init__(self, location: Square, piece: str):
         super().__init__(location, piece)
         direction = +1 if piece == 'p' else -1
@@ -50,6 +52,7 @@ class Pawn(Piece):
 
 
 class RayBased(Piece, ABC):
+    """"""
     def __init__(self, location, piece):
         super().__init__(location, piece)
 
@@ -67,6 +70,7 @@ class RayBased(Piece, ABC):
 
 
 class Queen(RayBased):
+    """"""
     def __init__(self, location: Square, piece: str):
         super().__init__(location, piece)
         row, col = location
@@ -82,7 +86,8 @@ class Queen(RayBased):
         ]
 
 
-class Rock(RayBased):
+class Rook(RayBased):
+    """"""
     def __init__(self, location: Square, piece: str):
         super().__init__(location, piece)
         row, col = location
@@ -95,6 +100,7 @@ class Rock(RayBased):
 
 
 class Bishop(RayBased):
+    """"""
     def __init__(self, location: Square, piece: str):
         super().__init__(location, piece)
         row, col = location
@@ -107,6 +113,7 @@ class Bishop(RayBased):
 
 
 class Knight(Piece):
+    """"""
     def __init__(self, location: Square, piece: str):
         super().__init__(location, piece)
         row, col = location
@@ -135,6 +142,7 @@ class Knight(Piece):
 
 
 class King(Piece):
+    """"""
     def __init__(self, location: Square, piece: str):
         super().__init__(location, piece)
         row, col = location
@@ -268,7 +276,7 @@ class Game:
             case 'p' | 'P':
                 return Pawn((row, col), piece)
             case 'r' | 'R':
-                return Rock((row, col), piece)
+                return Rook((row, col), piece)
             case 'n' | 'N':
                 return Knight((row, col), piece)
             case 'b' | 'B':
@@ -281,10 +289,12 @@ class Game:
     def available_moves(self) -> Generator[Tuple[str, Game], None, None]:
         other = "w" if self.board.turn == "b" else "b"
         next_move_number = self.board.move_number if other == "b" else self.board.move_number + 1
-        for move in self._raw_moves():
+        for move in self._raw_moves(player=self.board.turn):
+
             stats = self.board.stats.copy()
             piece_placement = np.copy(self.board.piece_placement)
             location_to_piece = self.board.location_to_piece.copy()
+
             row_from, col_from, row_to, col_to, piece = move
             status_dest = self.board.piece_placement[row_to, col_to]
             if status_dest != ' ':
@@ -294,6 +304,7 @@ class Game:
             del location_to_piece[row_from, col_from] # the piece is already in its new place
             piece_placement[row_from, col_from] = ' '
             piece_placement[row_to, col_to] = status_src
+
             g = Game(
                 other,
                 self.board.casteling,
@@ -304,18 +315,38 @@ class Game:
                 piece_placement,
                 location_to_piece,
             )
+
+            # is it a valid game/board?
+            if g._is_check(which_king=self.board.turn):
+                # we either did not protect the king, or have exposed it
+                continue # it is not, that move should not be considered
+
             yield f'{move}', g
 
-    def _raw_moves(self) -> Generator[Tuple[int, int, int, int, str], None, None]:
-        for r, c, p in self.__current_player_pieces():
+    def is_check(self) -> bool:
+        return self._is_check(self.board.turn)
+
+    def _is_check(self, which_king: str) -> bool:
+        """Returns wheater the relevant king is being treated."""
+        king = "k" if which_king == "w" else "K"
+        other = "b" if which_king == "w" else "w"
+        king_location = np.where(self.board.piece_placement == king)
+        for move in self._raw_moves(player=other):
+            _, _, row_to, col_to, _ = move
+            if king_location == (row_to, col_to):
+                return True
+        return False
+
+    def _raw_moves(self, player: str) -> Generator[Tuple[int, int, int, int, str], None, None]:
+        for r, c, p in self.__current_player_pieces(player):
             piece = self.board.location_to_piece[r, c]
             for dest in piece.theoretical_moves(lambda square: self.board.piece_placement[square]):
                 yield r, c, *dest, p
 
-    def __current_player_pieces(self) -> Generator[Tuple[int, int, str], None, None]:
+    def __current_player_pieces(self, player: str) -> Generator[Tuple[int, int, str], None, None]:
         relevant_pieces = (
             ['p', 'r', 'n', 'b', 'q', 'k']
-            if self.board.turn == 'w'
+            if player == 'w'
             else ['P', 'R', 'N', 'B', 'Q', 'K']
         )
         for r, c in zip(*np.where(np.isin(self.board.piece_placement, relevant_pieces))):
