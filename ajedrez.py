@@ -295,15 +295,20 @@ class Game:
             piece_placement = np.copy(self.board.piece_placement)
             location_to_piece = self.board.location_to_piece.copy()
 
-            row_from, col_from, row_to, col_to, piece = move
+            row_from, col_from, row_to, col_to, piece, promotion = move
             status_dest = self.board.piece_placement[row_to, col_to]
             if status_dest != ' ':
                 stats[status_dest] -= 1
-            location_to_piece[row_to, col_to] = Game.piece_for(piece, row_to, col_to) # potentially override
+            location_to_piece[row_to, col_to] = (
+                Game.piece_for(promotion or piece, row_to, col_to) # potentially override
+            )
             status_src = self.board.piece_placement[row_from, col_from]
             del location_to_piece[row_from, col_from] # the piece is already in its new place
             piece_placement[row_from, col_from] = ' '
             piece_placement[row_to, col_to] = status_src
+            if promotion:
+                stats[piece] -= 1
+                stats[promotion] += 1
 
             g = Game(
                 other,
@@ -332,16 +337,24 @@ class Game:
         other = "b" if which_king == "w" else "w"
         king_location = np.where(self.board.piece_placement == king)
         for move in self._raw_moves(player=other):
-            _, _, row_to, col_to, _ = move
+            _, _, row_to, col_to, _, _ = move
             if king_location == (row_to, col_to):
                 return True
         return False
 
-    def _raw_moves(self, player: str) -> Generator[Tuple[int, int, int, int, str], None, None]:
+    def _raw_moves(self, player: str) -> Generator[Tuple[int, int, int, int, str, str], None, None]:
         for r, c, p in self.__current_player_pieces(player):
             piece = self.board.location_to_piece[r, c]
             for dest in piece.theoretical_moves(lambda square: self.board.piece_placement[square]):
-                yield r, c, *dest, p
+                # offering options for promotion is done here, if relevant
+                if piece == 'p' and dest[1] == 7:
+                    for promotion in ['q', 'r', 'b', 'n']:
+                        yield r, c, *dest, p, promotion
+                elif piece == 'P' and dest[1] == 0:
+                    for promotion in ['Q', 'R', 'B', 'N']:
+                        yield r, c, *dest, p, promotion
+                else:
+                    yield r, c, *dest, p, None
 
     def __current_player_pieces(self, player: str) -> Generator[Tuple[int, int, str], None, None]:
         relevant_pieces = (
