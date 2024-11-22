@@ -246,22 +246,6 @@ class Game:
             for line in position.split('/')
         ])
 
-        def piece_for(row: int, col: int):
-            piece: str = piece_placement[row, col]
-            match piece:
-                case 'p' | 'P':
-                    return Pawn((row, col), piece)
-                case 'r' | 'R':
-                    return Rock((row, col), piece)
-                case 'n' | 'N':
-                    return Knight((row, col), piece)
-                case 'b' | 'B':
-                    return Bishop((row, col), piece)
-                case 'q' | 'Q':
-                    return Queen((row, col), piece)
-                case 'k' | 'K':
-                    return King((row, col), piece)
-
         return cls(
             turn=turn,
             casteling=casteling,
@@ -271,12 +255,28 @@ class Game:
             stats=Counter(position),
             piece_placement=piece_placement,
             location_to_piece={
-                (row, col): piece_for(row, col)
+                (row, col): cls.piece_for(piece_placement[row, col], row, col)
                 for row in range(8)
                 for col in range(8)
                 if piece_placement[row, col] != ' '
             }
         )
+
+    @classmethod
+    def piece_for(cls, piece: str, row: int, col: int):
+        match piece:
+            case 'p' | 'P':
+                return Pawn((row, col), piece)
+            case 'r' | 'R':
+                return Rock((row, col), piece)
+            case 'n' | 'N':
+                return Knight((row, col), piece)
+            case 'b' | 'B':
+                return Bishop((row, col), piece)
+            case 'q' | 'Q':
+                return Queen((row, col), piece)
+            case 'k' | 'K':
+                return King((row, col), piece)
 
     def available_moves(self) -> Generator[Tuple[str, Game], None, None]:
         other = "w" if self.board.turn == "b" else "b"
@@ -289,7 +289,7 @@ class Game:
             status_dest = self.board.piece_placement[row_to, col_to]
             if status_dest != ' ':
                 stats[status_dest] -= 1
-            location_to_piece[row_to, col_to] = location_to_piece[row_from, col_from] # potentially override
+            location_to_piece[row_to, col_to] = Game.piece_for(piece, row_to, col_to) # potentially override
             status_src = self.board.piece_placement[row_from, col_from]
             del location_to_piece[row_from, col_from] # the piece is already in its new place
             piece_placement[row_from, col_from] = ' '
