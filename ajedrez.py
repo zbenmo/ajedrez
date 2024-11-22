@@ -302,10 +302,9 @@ class Game:
             location_to_piece[row_to, col_to] = (
                 Game.piece_for(promotion or piece, row_to, col_to) # potentially override
             )
-            status_src = self.board.piece_placement[row_from, col_from]
             del location_to_piece[row_from, col_from] # the piece is already in its new place
             piece_placement[row_from, col_from] = ' '
-            piece_placement[row_to, col_to] = status_src
+            piece_placement[row_to, col_to] = promotion or piece
             if promotion:
                 stats[piece] -= 1
                 stats[promotion] += 1
