@@ -228,8 +228,8 @@ class Game:
             turn=turn,
             casteling_rights=casteling,
             en_passant=en_passant,
-            half_moves=int(half_moves),
-            move_number=int(move_number),
+            half_moves=half_moves,
+            move_number=move_number,
             stats=stats,
             piece_placement=piece_placement,
             location_to_piece=location_to_piece
