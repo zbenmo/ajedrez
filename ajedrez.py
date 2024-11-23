@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+import itertools
 from typing import Dict, Generator, Tuple, Callable
 from collections import Counter
 import numpy as np
@@ -289,7 +290,8 @@ class Game:
     def available_moves(self) -> Generator[Tuple[str, Game], None, None]:
         other = "w" if self.board.turn == "b" else "b"
         next_move_number = self.board.move_number if other == "b" else self.board.move_number + 1
-        for move in self._raw_moves(player=self.board.turn):
+        for move in itertools.chain(
+            self._raw_moves(player=self.board.turn), self._casteling_raw_moves(player=self.board.turn)):
 
             stats = self.board.stats.copy()
             piece_placement = np.copy(self.board.piece_placement)
@@ -309,7 +311,7 @@ class Game:
                 stats[piece] -= 1
                 stats[promotion] += 1
 
-            # en - passant
+            # en-passant (capture)
             if (status_dest == ' ') and (piece == 'p' or piece == 'P') and (col_from != col_to):
                 target_row = row_to + 1 if piece == 'p' else row_to - 1
                 status_dest = self.board.piece_placement[target_row, col_to]
@@ -317,7 +319,22 @@ class Game:
                 stats[status_dest] -= 1
                 del location_to_piece[target_row, col_to]
 
-            en_passant = '-'
+            # casteling
+            if (piece == 'k' or piece == 'K') and (abs(col_from - col_to) == 2):
+                if col_to == 6:
+                    piece_placement[row_to, 5] = piece.board.piece_placement[row_to, 7]
+                    piece_placement[row_to, 7] = ' '
+                    del location_to_piece[row_to, 7]
+                    location_to_piece[row_to, 5] = Game.piece_for(piece_placement[row_to, 5], row_to, 5)
+                elif col_to == 2:
+                    piece_placement[row_to, 3] = piece.board.piece_placement[row_to, 0]
+                    piece_placement[row_to, 0] = ' '
+                    del location_to_piece[row_to, 0]
+                    location_to_piece[row_to, 3] = Game.piece_for(piece_placement[row_to, 3], row_to, 3)
+                else:
+                    assert False, f'{col_to=}'
+
+            en_passant = '-' # for next turn
             if (
                 (piece == 'p' and (row_from == 1) and (row_to == 3))
                 or
@@ -325,9 +342,27 @@ class Game:
                 ):
                 en_passant = chr(ord('a') + col_from)
 
+            casteling = self.board.casteling # for next turn
+            if piece == 'k':
+                casteling = casteling.replace('k', '')
+                casteling = casteling.replace('q', '')
+            elif piece == 'K':
+                casteling = casteling.replace('K', '')
+                casteling = casteling.replace('Q', '')
+            elif piece == 'r':
+                if col_from == 0:
+                    casteling = casteling.replace('q', '')
+                elif col_from == 7:
+                    casteling = casteling.replace('k', '')
+            elif piece == 'R':
+                if col_from == 0:
+                    casteling = casteling.replace('Q', '')
+                elif col_from == 7:
+                    casteling = casteling.replace('K', '')
+
             g = Game(
                 other,
-                self.board.casteling,
+                casteling,
                 en_passant,
                 self.board.half_moves,
                 next_move_number,
@@ -351,9 +386,15 @@ class Game:
         king = "k" if which_king == "w" else "K"
         other = "b" if which_king == "w" else "w"
         king_location = np.where(self.board.piece_placement == king)
-        for move in self._raw_moves(player=other):
+        return self._is_treatened_by(king_location, by=other)
+
+    def _is_treatened_by(self, square: Square, by: str):
+        """Returns wheater the relevant squares is being tretened.
+        'by' should be either 'w' or 'b'
+        """
+        for move in self._raw_moves(player=by):
             _, _, row_to, col_to, _, _ = move
-            if king_location == (row_to, col_to):
+            if square == (row_to, col_to):
                 return True
         return False
 
@@ -386,6 +427,43 @@ class Game:
                         yield r, c, *dest, p, promotion
                 else:
                     yield r, c, *dest, p, None
+
+    def _casteling_raw_moves(self, player: str) -> Generator[Tuple[int, int, int, int, str, str], None, None]:
+        assert player == self.board.turn
+        if player == "w":
+            other = "b"
+            row = 0
+            king_casteling = "k"
+            queen_casteling = "q"
+            king = "k"
+            rook = "r"
+        else:
+            other = "w"
+            row = 7
+            king_casteling = "K"
+            queen_casteling = "Q"
+            king = "K"
+            rook = "R"
+
+        if (king_casteling not in self.board.casteling) and (queen_casteling not in self.board.casteling):
+            return
+
+        if self.is_check():
+            return
+
+        assert self.board.piece_placement[row, 4] == king
+
+        if king_casteling in self.board.casteling:
+            assert self.board.piece_placement[row, 7] == rook
+            if self.board.piece_placement[row, 5] == ' ' and self.board.piece_placement[row, 6] == ' ':
+                if not self._is_treatened_by((row, 5), other) and not self._is_treatened_by((row, 6), other):
+                    yield row, 4, row, 6, king, None
+
+        if queen_casteling in self.board.casteling:
+            assert self.board.piece_placement[row, 0] == rook
+            if self.board.piece_placement[row, 3] == ' ' and self.board.piece_placement[row, 2] == ' ':
+                if not self._is_treatened_by((row, 3), other) and not self._is_treatened_by((row, 2), other):
+                    yield row, 4, row, 2, king, None
 
     def __current_player_pieces(self, player: str) -> Generator[Tuple[int, int, str], None, None]:
         relevant_pieces = (
