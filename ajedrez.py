@@ -420,7 +420,7 @@ class Game:
         return False
 
     def _raw_moves(self, player: str) -> Generator[Tuple[int, int, int, int, str, str], None, None]:
-        for r, c, p in self.__current_player_pieces(player):
+        for r, c, p in self._player_pieces(player):
             piece: Piece = self.board.location_to_piece[r, c]
 
             # a bit logic for en-passant, if relevant, pretend you have there a Pawn
@@ -486,7 +486,7 @@ class Game:
                 if not self._is_treatened_by((row, 3), other) and not self._is_treatened_by((row, 2), other):
                     yield row, 4, row, 2, king, None
 
-    def __current_player_pieces(self, player: str) -> Generator[Tuple[int, int, str], None, None]:
+    def _player_pieces(self, player: str) -> Generator[Tuple[int, int, str], None, None]:
         relevant_pieces = (
             [W_P, W_R, W_N, W_B, W_Q, W_K]
             if player == 'w'
