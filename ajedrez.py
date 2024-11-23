@@ -306,6 +306,9 @@ class Game:
             half_moves += 1 # till shown otherwise
 
             row_from, col_from, row_to, col_to, piece, promotion = move
+            move_formated = (
+                f'{chr(ord("a") + col_from)}{row_from + 1}{chr(ord("a") + col_to)}{row_to + 1}{promotion or ""}'
+            )
 
             if piece == W_P or piece == B_P:
                 half_moves = 0
@@ -394,7 +397,7 @@ class Game:
                 # we either did not protect the king, or have exposed it
                 continue # it is not, that move should not be considered
 
-            yield f'{move}', g
+            yield move_formated, g
 
     def is_check(self) -> bool:
         return self._is_check(self.board.turn)
