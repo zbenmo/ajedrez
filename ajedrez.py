@@ -355,7 +355,7 @@ class Game:
                 or
                 (piece == B_P and (row_from == 6) and (row_to == 4))
                 ):
-                en_passant = chr(ord('a') + col_from)
+                en_passant = f"{chr(ord('a') + col_from)}{3 if row_to == 3 else 6}"
 
             # update casteling for next turn
             if piece == W_K:
@@ -424,7 +424,7 @@ class Game:
             magic_square = None # for en-passant
             if self.board.en_passant != '-' and isinstance(piece, Pawn):
                 # above isinstance(piece, Pawn) is redundant yet added for clarity
-                en_passant = ord(self.board.en_passant) - ord('a')
+                en_passant = ord(self.board.en_passant[0]) - ord('a')
                 if c != en_passant: # if it is exactly in the current column, we don't want to "add" it
                     if p == W_P:
                         magic_square = (5, en_passant)
