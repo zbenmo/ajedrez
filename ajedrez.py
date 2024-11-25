@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass
 import itertools
+from pprint import pprint
 from typing import Dict, Generator, List, Tuple, Callable
 from collections import Counter
 #import numpy as np
@@ -84,10 +85,10 @@ class Pawn(Piece):
         for move in self.moves:
             if get_square_status(move) == EMPTY:
                 yield move
-        for capture in self.captures:
-            status = get_square_status(move) 
-            if status != EMPTY and get_square_status(move).islower() != self.piece.islower():
-                yield capture
+        for move in self.captures:
+            status = get_square_status(move)
+            if status != EMPTY and status.islower() != self.piece.islower():
+                yield move
 
 
 class RayBased(Piece, ABC):
@@ -345,12 +346,12 @@ class Game:
             )
 
             if piece == W_P or piece == B_P:
-                half_moves = 0
+                half_moves = 0 # a Pawn made a move
 
             status_dest = self.board.piece_placement[row_to, col_to]
             if status_dest != EMPTY:
                 stats[status_dest] -= 1
-                half_moves = 0
+                half_moves = 0 # a capture
             location_to_piece[row_to, col_to] = (
                 Game.piece_for(promotion or piece, row_to, col_to) # potentially override
             )
@@ -363,9 +364,16 @@ class Game:
 
             # en-passant (capture)
             if (status_dest == EMPTY) and (piece == W_P or piece == B_P) and (col_from != col_to):
-                target_row = row_to + 1 if piece == W_P else row_to - 1
+                print(f'{row_from=}')
+                print(f'{col_from=}')
+                print(f'{row_to=}')
+                print(f'{col_to=}')
+                target_row = row_to - 1 if piece == W_P else row_to + 1
                 status_dest = self.board.piece_placement[target_row, col_to]
-                assert status_dest == W_P or status_dest == B_P
+                good = status_dest == W_P or status_dest == B_P
+                if not good:
+                    pprint(list(reversed(self.board.piece_placement.values)))
+                assert status_dest == W_P or status_dest == B_P, f'{target_row=}, {col_from=}, {col_to=}, {status_dest=}'
                 stats[status_dest] -= 1
                 del location_to_piece[target_row, col_to]
 
@@ -458,20 +466,21 @@ class Game:
             piece: Piece = self.board.location_to_piece[r, c]
 
             # a bit logic for en-passant, if relevant, pretend you have there a Pawn
-            magic_square = None # for en-passant
+            en_passant_square = None # for en-passant
             if self.board.en_passant != '-' and isinstance(piece, Pawn):
                 # above isinstance(piece, Pawn) is redundant yet added for clarity
                 en_passant = ord(self.board.en_passant[0]) - ord('a')
                 if c != en_passant: # if it is exactly in the current column, we don't want to "add" it
+                    print(f'{c=}, {en_passant=}')
                     if p == W_P:
-                        magic_square = (5, en_passant)
-                        magic_piece = B_P
+                        en_passant_square = (5, en_passant)
+                        en_passant_piece = B_P
                     elif p == B_P:
-                        magic_square = (2, en_passant)
-                        magic_piece = W_P
+                        en_passant_square = (2, en_passant)
+                        en_passant_piece = W_P
 
             for dest in piece.theoretical_moves(
-                lambda square: magic_piece if square == magic_square else self.board.piece_placement[square]
+                lambda square: en_passant_piece if square == en_passant_square else self.board.piece_placement[square]
                 ):
                 # offering options for promotion is done here, if relevant
                 if p == W_P and dest[0] == 7:
