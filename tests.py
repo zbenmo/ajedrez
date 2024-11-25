@@ -47,3 +47,26 @@ def test_6():
             print(f"{m=}")
             raise
     assert len(max(stat, key=stat.get)) > 0 # ?
+
+def test_7():
+    game = Game.from_fen('r1b1kb1r/3qpp1p/ppQp1np1/8/2PNP3/8/PP1N1PPP/1RB1KB1R w Kkq - 1 10')
+    # list(game.available_moves())
+    moves_to_game = dict(game.available_moves())
+
+    # moves = list(moves_to_game)
+
+    def get_value(game):
+        me, they = game.board.simple_heuristic()
+        return me - they
+            
+    stat = {}
+    for m, g in moves_to_game.items():
+        try:
+            counts = []
+            for m_o, g_o in g.available_moves():
+                counts.append(get_value(g_o))
+            stat[m] = min(counts)
+        except:
+            print(f"{m=}")
+            raise
+    assert len(max(stat, key=stat.get)) > 0 # ?

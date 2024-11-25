@@ -358,6 +358,12 @@ class Game:
             if status_dest != EMPTY:
                 stats[status_dest] -= 1
                 half_moves = 0 # a capture
+                # Rook was eaten - potentially before attempt to castelling.
+                if status_dest == W_R or status_dest == B_R:
+                    if col_to == 0:
+                        casteling_rights = casteling_rights.replace('Q' if status_dest == W_R else 'q', '')
+                    elif col_to == 7:
+                        casteling_rights = casteling_rights.replace('K' if status_dest == W_R else 'k', '')
             location_to_piece[row_to, col_to] = (
                 Game.piece_for(promotion or piece, row_to, col_to) # potentially override
             )
