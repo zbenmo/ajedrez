@@ -471,7 +471,6 @@ class Game:
                 # above isinstance(piece, Pawn) is redundant yet added for clarity
                 en_passant = ord(self.board.en_passant[0]) - ord('a')
                 if c != en_passant: # if it is exactly in the current column, we don't want to "add" it
-                    print(f'{c=}, {en_passant=}')
                     if p == W_P:
                         en_passant_square = (5, en_passant)
                         en_passant_piece = B_P
