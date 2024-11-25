@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from dataclasses import dataclass
 import itertools
-from typing import Dict, Generator, Tuple, Callable
+from typing import Dict, Generator, List, Tuple, Callable
 from collections import Counter
-import numpy as np
+#import numpy as np
 
 
 Square = Tuple[int, int]
@@ -12,6 +13,39 @@ GetSquareStatus = Callable[[Square], str]
 W_P, W_R, W_N, W_B, W_Q, W_K = "PRNBQK"
 B_P, B_R, B_N, B_B, B_Q, B_K = "prnbqk"
 EMPTY = " "
+
+
+class Matrix:
+    """A simple replacement for numpy matrix."""
+
+class Matrix:
+    def __init__(self, values: List[List[str]]):
+        self.values = values
+
+    def __getitem__(self, square: Square) -> str:
+        (r, c) = square
+        return self.values[r][c]
+
+    def __setitem__(self, square: Square, val) -> Matrix:
+        (r, c) = square
+        self.values[r][c] = val
+        return self
+
+    def find(self, val: str) -> Tuple[int, int]:
+        for r_i, row in enumerate(self.values):
+            if val in row:
+                return (r_i, row.index(val))
+
+    def copy(self) -> Matrix:
+        return Matrix([
+            row[:] for row in self.values
+        ])
+
+    def where(self, vals) -> Generator[Tuple[int, int, str], None, None]:
+        for r_i, row in enumerate(self.values):
+            for c_i, val in enumerate(row):
+                if val in vals:
+                    yield r_i, c_i, val
 
 
 class Piece(ABC):
@@ -190,7 +224,7 @@ class Board:
     half_moves: int
     move_number: int
     stats: Dict[str, int] # how many of each piece are there. There might be some extra stuff there
-    piece_placement: 'np.array'
+    piece_placement: Matrix # 'np.array'
     location_to_piece: Dict[Square, Piece]
 
     def simple_heuristic(self) -> Tuple[float, float]:
@@ -221,7 +255,7 @@ class Game:
         half_moves: int,
         move_number: int,
         stats: Dict[str, int],
-        piece_placement: 'np.array',
+        piece_placement: Matrix, #'np.array',
         location_to_piece: Dict[Square, Piece]
         ):
         self.board = Board(
@@ -254,7 +288,7 @@ class Game:
                 else:
                     yield char
 
-        piece_placement = np.array([
+        piece_placement = Matrix([
             list(split_and_expand(line))
             for line in reversed(position.split('/'))
         ])
@@ -298,7 +332,7 @@ class Game:
             self._raw_moves(player=self.board.turn), self._casteling_raw_moves(player=self.board.turn)):
 
             stats = self.board.stats.copy()
-            piece_placement = np.copy(self.board.piece_placement)
+            piece_placement = self.board.piece_placement.copy()
             location_to_piece = self.board.location_to_piece.copy()
             casteling = self.board.casteling_rights
             half_moves = self.board.half_moves
@@ -406,7 +440,7 @@ class Game:
         """Returns wheater the relevant king is being treated."""
         king = W_K if which_king == "w" else B_K
         other = "b" if which_king == "w" else "w"
-        king_location = np.where(self.board.piece_placement == king)
+        king_location = self.board.piece_placement.find(king)
         return self._is_treatened_by(king_location, by=other)
 
     def _is_treatened_by(self, square: Square, by: str):
@@ -492,8 +526,7 @@ class Game:
             if player == 'w'
             else [B_P, B_R, B_N, B_B, B_Q, B_K]
         )
-        for r, c in zip(*np.where(np.isin(self.board.piece_placement, relevant_pieces))):
-            yield r.item(), c.item(), self.board.piece_placement[r, c].item()
+        yield from self.board.piece_placement.where(relevant_pieces)
 
     def __repr__(self):
         return f"""{self.board}"""
