@@ -85,6 +85,8 @@ class Pawn(Piece):
         for move in self.moves:
             if get_square_status(move) == EMPTY:
                 yield move
+            else:
+                break
         for move in self.captures:
             status = get_square_status(move)
             if status != EMPTY and status.islower() != self.piece.islower():
@@ -364,15 +366,8 @@ class Game:
 
             # en-passant (capture)
             if (status_dest == EMPTY) and (piece == W_P or piece == B_P) and (col_from != col_to):
-                print(f'{row_from=}')
-                print(f'{col_from=}')
-                print(f'{row_to=}')
-                print(f'{col_to=}')
                 target_row = row_to - 1 if piece == W_P else row_to + 1
                 status_dest = self.board.piece_placement[target_row, col_to]
-                good = status_dest == W_P or status_dest == B_P
-                if not good:
-                    pprint(list(reversed(self.board.piece_placement.values)))
                 assert status_dest == W_P or status_dest == B_P, f'{target_row=}, {col_from=}, {col_to=}, {status_dest=}'
                 stats[status_dest] -= 1
                 del location_to_piece[target_row, col_to]
