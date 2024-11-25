@@ -1,11 +1,8 @@
 from abc import ABC, abstractmethod
-from copy import deepcopy
 from dataclasses import dataclass
 import itertools
-from pprint import pprint
 from typing import Dict, Generator, List, Tuple, Callable
 from collections import Counter
-#import numpy as np
 
 
 Square = Tuple[int, int]
@@ -377,12 +374,12 @@ class Game:
             if (piece == W_K or piece == B_K) and (abs(col_from - col_to) == 2):
                 is_casteling = True
                 if col_to == 6:
-                    piece_placement[row_to, 5] = piece.board.piece_placement[row_to, 7]
+                    piece_placement[row_to, 5] = piece_placement[row_to, 7]
                     piece_placement[row_to, 7] = EMPTY
                     del location_to_piece[row_to, 7]
                     location_to_piece[row_to, 5] = Game.piece_for(piece_placement[row_to, 5], row_to, 5)
                 elif col_to == 2:
-                    piece_placement[row_to, 3] = piece.board.piece_placement[row_to, 0]
+                    piece_placement[row_to, 3] = piece_placement[row_to, 0]
                     piece_placement[row_to, 0] = EMPTY
                     del location_to_piece[row_to, 0]
                     location_to_piece[row_to, 3] = Game.piece_for(piece_placement[row_to, 3], row_to, 3)
