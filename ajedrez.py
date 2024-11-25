@@ -250,7 +250,7 @@ default_fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 class Game:
     def __init__(self,
         turn: str,
-        casteling: str,
+        casteling_rights: str,
         en_passant: str,
         half_moves: int,
         move_number: int,
@@ -260,7 +260,7 @@ class Game:
         ):
         self.board = Board(
             turn=turn,
-            casteling_rights=casteling,
+            casteling_rights=casteling_rights,
             en_passant=en_passant,
             half_moves=half_moves,
             move_number=move_number,
@@ -269,12 +269,19 @@ class Game:
             location_to_piece=location_to_piece
         )
 
+    def _verify(self):
+        for r_i, row in enumerate(self.board.piece_placement.values):
+            for c_i, val in enumerate(row):
+                if val != EMPTY:
+                    assert self.board.location_to_piece[r_i, c_i].piece == val, f'{r_i=}, {c_i=}, {val=}'
+        # TODO: check more
+
     @classmethod
     def from_fen(cls, fen: str = default_fen):
         (
             position,
             turn,
-            casteling,
+            casteling_rights,
             en_passant,
             half_moves,
             move_number
@@ -295,7 +302,7 @@ class Game:
 
         return cls(
             turn=turn,
-            casteling=casteling,
+            casteling_rights=casteling_rights,
             en_passant=en_passant,
             half_moves=int(half_moves),
             move_number=int(move_number),
@@ -334,7 +341,7 @@ class Game:
             stats = self.board.stats.copy()
             piece_placement = self.board.piece_placement.copy()
             location_to_piece = self.board.location_to_piece.copy()
-            casteling = self.board.casteling_rights
+            casteling_rights = self.board.casteling_rights
             half_moves = self.board.half_moves
 
             half_moves += 1 # till shown otherwise
@@ -364,7 +371,8 @@ class Game:
             # en-passant (capture)
             if (status_dest == EMPTY) and (piece == W_P or piece == B_P) and (col_from != col_to):
                 target_row = row_to - 1 if piece == W_P else row_to + 1
-                status_dest = self.board.piece_placement[target_row, col_to]
+                status_dest = piece_placement[target_row, col_to]
+                piece_placement[target_row, col_to] = EMPTY
                 assert status_dest == W_P or status_dest == B_P, f'{target_row=}, {col_from=}, {col_to=}, {status_dest=}'
                 stats[status_dest] -= 1
                 del location_to_piece[target_row, col_to]
@@ -396,27 +404,27 @@ class Game:
 
             # update casteling for next turn
             if piece == W_K:
-                casteling = casteling.replace('K', '')
-                casteling = casteling.replace('Q', '')
+                casteling_rights = casteling_rights.replace('K', '')
+                casteling_rights = casteling_rights.replace('Q', '')
             elif piece == B_K:
-                casteling = casteling.replace('k', '')
-                casteling = casteling.replace('q', '')
+                casteling_rights = casteling_rights.replace('k', '')
+                casteling_rights = casteling_rights.replace('q', '')
             elif piece == W_R:
                 if col_from == 0:
-                    casteling = casteling.replace('Q', '')
+                    casteling_rights = casteling_rights.replace('Q', '')
                 elif col_from == 7:
-                    casteling = casteling.replace('K', '')
+                    casteling_rights = casteling_rights.replace('K', '')
             elif piece == B_R:
                 if col_from == 0:
-                    casteling = casteling.replace('q', '')
+                    casteling_rights = casteling_rights.replace('q', '')
                 elif col_from == 7:
-                    casteling = casteling.replace('k', '')
-            if len(casteling) < 1:
-                casteling = '-'
+                    casteling_rights = casteling_rights.replace('k', '')
+            if len(casteling_rights) < 1:
+                casteling_rights = '-'
 
             g = Game(
                 other,
-                casteling,
+                casteling_rights,
                 en_passant,
                 half_moves,
                 next_move_number,
@@ -424,6 +432,8 @@ class Game:
                 piece_placement,
                 location_to_piece,
             )
+
+            # g._verify()
 
             # is it a valid game/board?
             if g._is_check(which_king=self.board.turn):
@@ -500,7 +510,11 @@ class Game:
             king = B_K
             rook = B_R
 
-        if (king_casteling not in self.board.casteling_rights) and (queen_casteling not in self.board.casteling_rights):
+        if (
+            (king_casteling not in self.board.casteling_rights)
+            and
+            (queen_casteling not in self.board.casteling_rights)
+        ):
             return
 
         if self.is_check():
