@@ -219,7 +219,7 @@ class Game:
 @dataclass
 class Board:
     turn: str # should be either 'w' or 'b'
-    casteling_rights: str # options still available
+    castling_rights: str # options still available
     en_passant: str
     half_moves: int
     move_number: int
@@ -250,7 +250,7 @@ default_fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 class Game:
     def __init__(self,
         turn: str,
-        casteling_rights: str,
+        castling_rights: str,
         en_passant: str,
         half_moves: int,
         move_number: int,
@@ -260,7 +260,7 @@ class Game:
         ):
         self.board = Board(
             turn=turn,
-            casteling_rights=casteling_rights,
+            castling_rights=castling_rights,
             en_passant=en_passant,
             half_moves=half_moves,
             move_number=move_number,
@@ -281,7 +281,7 @@ class Game:
         (
             position,
             turn,
-            casteling_rights,
+            castling_rights,
             en_passant,
             half_moves,
             move_number
@@ -302,7 +302,7 @@ class Game:
 
         return cls(
             turn=turn,
-            casteling_rights=casteling_rights,
+            castling_rights=castling_rights,
             en_passant=en_passant,
             half_moves=int(half_moves),
             move_number=int(move_number),
@@ -336,12 +336,12 @@ class Game:
         other = "w" if self.board.turn == "b" else "b"
         next_move_number = self.board.move_number if other == "b" else self.board.move_number + 1
         for move in itertools.chain(
-            self._raw_moves(player=self.board.turn), self._casteling_raw_moves(player=self.board.turn)):
+            self._raw_moves(player=self.board.turn), self._castling_raw_moves(player=self.board.turn)):
 
             stats = self.board.stats.copy()
             piece_placement = self.board.piece_placement.copy()
             location_to_piece = self.board.location_to_piece.copy()
-            casteling_rights = self.board.casteling_rights
+            castling_rights = self.board.castling_rights
             half_moves = self.board.half_moves
 
             half_moves += 1 # till shown otherwise
@@ -358,12 +358,12 @@ class Game:
             if status_dest != EMPTY:
                 stats[status_dest] -= 1
                 half_moves = 0 # a capture
-                # Rook was eaten - potentially before attempt to castelling.
+                # Rook was eaten - potentially before attempt to castling.
                 if status_dest == W_R or status_dest == B_R:
                     if col_to == 0:
-                        casteling_rights = casteling_rights.replace('Q' if status_dest == W_R else 'q', '')
+                        castling_rights = castling_rights.replace('Q' if status_dest == W_R else 'q', '')
                     elif col_to == 7:
-                        casteling_rights = casteling_rights.replace('K' if status_dest == W_R else 'k', '')
+                        castling_rights = castling_rights.replace('K' if status_dest == W_R else 'k', '')
             location_to_piece[row_to, col_to] = (
                 Game.piece_for(promotion or piece, row_to, col_to) # potentially override
             )
@@ -383,10 +383,10 @@ class Game:
                 stats[status_dest] -= 1
                 del location_to_piece[target_row, col_to]
 
-            # casteling
-            is_casteling = False
+            # castling
+            is_castling = False
             if (piece == W_K or piece == B_K) and (abs(col_from - col_to) == 2):
-                is_casteling = True
+                is_castling = True
                 if col_to == 6:
                     piece_placement[row_to, 5] = piece_placement[row_to, 7]
                     piece_placement[row_to, 7] = EMPTY
@@ -408,29 +408,29 @@ class Game:
                 ):
                 en_passant = f"{chr(ord('a') + col_from)}{3 if row_to == 3 else 6}"
 
-            # update casteling for next turn
+            # update castling for next turn
             if piece == W_K:
-                casteling_rights = casteling_rights.replace('K', '')
-                casteling_rights = casteling_rights.replace('Q', '')
+                castling_rights = castling_rights.replace('K', '')
+                castling_rights = castling_rights.replace('Q', '')
             elif piece == B_K:
-                casteling_rights = casteling_rights.replace('k', '')
-                casteling_rights = casteling_rights.replace('q', '')
+                castling_rights = castling_rights.replace('k', '')
+                castling_rights = castling_rights.replace('q', '')
             elif piece == W_R:
                 if col_from == 0:
-                    casteling_rights = casteling_rights.replace('Q', '')
+                    castling_rights = castling_rights.replace('Q', '')
                 elif col_from == 7:
-                    casteling_rights = casteling_rights.replace('K', '')
+                    castling_rights = castling_rights.replace('K', '')
             elif piece == B_R:
                 if col_from == 0:
-                    casteling_rights = casteling_rights.replace('q', '')
+                    castling_rights = castling_rights.replace('q', '')
                 elif col_from == 7:
-                    casteling_rights = casteling_rights.replace('k', '')
-            if len(casteling_rights) < 1:
-                casteling_rights = '-'
+                    castling_rights = castling_rights.replace('k', '')
+            if len(castling_rights) < 1:
+                castling_rights = '-'
 
             g = Game(
                 other,
-                casteling_rights,
+                castling_rights,
                 en_passant,
                 half_moves,
                 next_move_number,
@@ -443,7 +443,7 @@ class Game:
 
             # is it a valid game/board?
             if g._is_check(which_king=self.board.turn):
-                assert not is_casteling # because I believe I've already verified there
+                assert not is_castling # because I believe I've already verified there
                 # we either did not protect the king, or have exposed it
                 continue # it is not, that move should not be considered
 
@@ -499,27 +499,27 @@ class Game:
                 else:
                     yield r, c, *dest, p, None
 
-    def _casteling_raw_moves(self, player: str) -> Generator[Tuple[int, int, int, int, str, str], None, None]:
+    def _castling_raw_moves(self, player: str) -> Generator[Tuple[int, int, int, int, str, str], None, None]:
         assert player == self.board.turn
         if player == "w":
             other = "b"
             row = 0
-            king_casteling = "K"
-            queen_casteling = "Q"
+            king_castling = "K"
+            queen_castling = "Q"
             king = W_K
             rook = W_R
         else:
             other = "w"
             row = 7
-            king_casteling = "k"
-            queen_casteling = "q"
+            king_castling = "k"
+            queen_castling = "q"
             king = B_K
             rook = B_R
 
         if (
-            (king_casteling not in self.board.casteling_rights)
+            (king_castling not in self.board.castling_rights)
             and
-            (queen_casteling not in self.board.casteling_rights)
+            (queen_castling not in self.board.castling_rights)
         ):
             return
 
@@ -528,20 +528,24 @@ class Game:
 
         assert self.board.piece_placement[row, 4] == king
 
-        if king_casteling in self.board.casteling_rights:
+        if king_castling in self.board.castling_rights:
             assert self.board.piece_placement[row, 7] == rook
             if self.board.piece_placement[row, 5] == EMPTY and self.board.piece_placement[row, 6] == EMPTY:
                 if not self._is_treatened_by((row, 5), other) and not self._is_treatened_by((row, 6), other):
                     yield row, 4, row, 6, king, None
 
-        if queen_casteling in self.board.casteling_rights:
+        if queen_castling in self.board.castling_rights:
             assert self.board.piece_placement[row, 0] == rook
             if (
                 self.board.piece_placement[row, 3] == EMPTY
                 and self.board.piece_placement[row, 2] == EMPTY
                 and self.board.piece_placement[row, 1] == EMPTY
             ):
-                if not self._is_treatened_by((row, 3), other) and not self._is_treatened_by((row, 2), other):
+                if (
+                    not self._is_treatened_by((row, 3), other)
+                    and not self._is_treatened_by((row, 2), other)
+                    and not self._is_treatened_by((row, 1), other)
+                ):
                     yield row, 4, row, 2, king, None
 
     def _player_pieces(self, player: str) -> Generator[Tuple[int, int, str], None, None]:

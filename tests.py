@@ -74,3 +74,26 @@ def test_7():
 def test_8():
     game = Game.from_fen('rn2k1nr/1P2Ppbp/8/6pQ/p5P1/2N1P3/PP1N1P1P/R1B1KB1R b KQkq - 0 14')
     list(game.available_moves())
+
+def test_9():
+    game = Game.from_fen('r1b1kb1r/p2ppppp/n7/q1pPB2n/4N3/1p6/P2QPPPP/R3KBNR b KQkq - 1 9')
+    # list(game.available_moves())
+    moves_to_game = dict(game.available_moves())
+
+    # moves = list(moves_to_game)
+
+    def get_value(game):
+        me, they = game.board.simple_heuristic()
+        return me - they
+            
+    stat = {}
+    for m, g in moves_to_game.items():
+        try:
+            counts = []
+            for m_o, g_o in g.available_moves():
+                counts.append(get_value(g_o))
+            stat[m] = min(counts)
+        except:
+            print(f"{m=}")
+            raise
+    assert len(max(stat, key=stat.get)) > 0 # ?
