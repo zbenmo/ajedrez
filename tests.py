@@ -70,3 +70,7 @@ def test_7():
             print(f"{m=}")
             raise
     assert len(max(stat, key=stat.get)) > 0 # ?
+
+def test_8():
+    game = Game.from_fen('rn2k1nr/1P2Ppbp/8/6pQ/p5P1/2N1P3/PP1N1P1P/R1B1KB1R b KQkq - 0 14')
+    list(game.available_moves())

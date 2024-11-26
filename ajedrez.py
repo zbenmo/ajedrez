@@ -536,7 +536,11 @@ class Game:
 
         if queen_casteling in self.board.casteling_rights:
             assert self.board.piece_placement[row, 0] == rook
-            if self.board.piece_placement[row, 3] == EMPTY and self.board.piece_placement[row, 2] == EMPTY:
+            if (
+                self.board.piece_placement[row, 3] == EMPTY
+                and self.board.piece_placement[row, 2] == EMPTY
+                and self.board.piece_placement[row, 1] == EMPTY
+            ):
                 if not self._is_treatened_by((row, 3), other) and not self._is_treatened_by((row, 2), other):
                     yield row, 4, row, 2, king, None
 
