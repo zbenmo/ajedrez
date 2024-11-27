@@ -26,7 +26,9 @@ class Matrix:
 
     def __setitem__(self, square: Square, val) -> Matrix:
         (r, c) = square
-        self.values[r][c] = val
+        new_row = self.values[r][:]
+        new_row[c] = val
+        self.values[r] = new_row
         return self
 
     def find(self, val: str) -> Tuple[int, int]:
@@ -35,9 +37,7 @@ class Matrix:
                 return (r_i, row.index(val))
 
     def copy(self) -> Matrix:
-        return Matrix([
-            row[:] for row in self.values
-        ])
+        return Matrix(self.values[:]) # a real copy will be only on write
 
     def where(self, vals) -> Generator[Tuple[int, int, str], None, None]:
         for r_i, row in enumerate(self.values):
