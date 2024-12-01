@@ -276,25 +276,25 @@ class Game:
                     assert self.board.location_to_piece[r_i, c_i].piece == val, f'{r_i=}, {c_i=}, {val=}'
         # TODO: check more
 
-    @classmethod
-    def _compress_and_join(cls, line: List[str]) -> str:
-        pieces = []
-        count_empty = 0
-        for piece in line:
-            if piece != ' ':
-                if count_empty > 0:
-                    pieces.append(str(count_empty))
-                    count_empty = 0
-                pieces.append(piece)
-            else:
-                count_empty += 1
-        if count_empty > 0:
-            pieces.append(str(count_empty))
-        return ''.join(pieces)
-
     def to_fen(self) -> str:
+
+        def compress_and_join(line: List[str]) -> str:
+            pieces = []
+            count_empty = 0
+            for piece in line:
+                if piece != ' ':
+                    if count_empty > 0:
+                        pieces.append(str(count_empty))
+                        count_empty = 0
+                    pieces.append(piece)
+                else:
+                    count_empty += 1
+            if count_empty > 0:
+                pieces.append(str(count_empty))
+            return ''.join(pieces)
+
         position = '/'.join(
-            Game._compress_and_join(line) for line in 
+            compress_and_join(line) for line in 
             reversed(self.board.piece_placement.values)
         )
         return f'{position} {self.board.turn} {self.board.castling_rights} {self.board.en_passant} {self.board.half_moves} {self.board.move_number}'
