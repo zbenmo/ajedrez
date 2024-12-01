@@ -277,6 +277,29 @@ class Game:
         # TODO: check more
 
     @classmethod
+    def _compress_and_join(cls, line: List[str]) -> str:
+        pieces = []
+        count_empty = 0
+        for piece in line:
+            if piece != ' ':
+                if count_empty > 0:
+                    pieces.append(str(count_empty))
+                    count_empty = 0
+                pieces.append(piece)
+            else:
+                count_empty += 1
+        if count_empty > 0:
+            pieces.append(str(count_empty))
+        return ''.join(pieces)
+
+    def to_fen(self) -> str:
+        position = '/'.join(
+            Game._compress_and_join(line) for line in 
+            reversed(self.board.piece_placement.values)
+        )
+        return f'{position} {self.board.turn} {self.board.castling_rights} {self.board.en_passant} {self.board.half_moves} {self.board.move_number}'
+
+    @classmethod
     def from_fen(cls, fen: str = default_fen):
         (
             position,
@@ -332,120 +355,141 @@ class Game:
             case 'k' | 'K':
                 return King((row, col), piece)
 
-    def available_moves(self) -> Generator[Tuple[str, Game], None, None]:
+    def make_specific_move(self, move_to_take: Tuple[int, int, int, int, str, str]) -> Game:
+        for move in self._available_moves():
+            if move != move_to_take:
+                continue
+            g = self._verify_move(move)
+            if g:
+                return g
+            else:
+                assert False, f"{move_to_take=}"
+        assert False, f"{move_to_take=}"
+
+    def _available_moves(self) -> Generator[Tuple[int, int, int, int, str, str], None, None]:
+        yield from itertools.chain(
+            self._raw_moves(player=self.board.turn), self._castling_raw_moves(player=self.board.turn))
+
+    def _verify_move(self, move: Tuple[int, int, int, int, str, str]) -> Game:
         other = "w" if self.board.turn == "b" else "b"
         next_move_number = self.board.move_number if other == "b" else self.board.move_number + 1
-        for move in itertools.chain(
-            self._raw_moves(player=self.board.turn), self._castling_raw_moves(player=self.board.turn)):
+        stats = self.board.stats.copy()
+        piece_placement = self.board.piece_placement.copy()
+        location_to_piece = self.board.location_to_piece.copy()
+        castling_rights = self.board.castling_rights
+        half_moves = self.board.half_moves
 
-            stats = self.board.stats.copy()
-            piece_placement = self.board.piece_placement.copy()
-            location_to_piece = self.board.location_to_piece.copy()
-            castling_rights = self.board.castling_rights
-            half_moves = self.board.half_moves
+        half_moves += 1 # till shown otherwise
 
-            half_moves += 1 # till shown otherwise
+        row_from, col_from, row_to, col_to, piece, promotion = move
+
+        if piece == W_P or piece == B_P:
+            half_moves = 0 # a Pawn made a move
+
+        status_dest = self.board.piece_placement[row_to, col_to]
+        if status_dest != EMPTY:
+            stats[status_dest] -= 1
+            half_moves = 0 # a capture
+            # Rook was eaten - potentially before attempt to castling.
+            if status_dest == W_R or status_dest == B_R:
+                if col_to == 0:
+                    castling_rights = castling_rights.replace('Q' if status_dest == W_R else 'q', '')
+                elif col_to == 7:
+                    castling_rights = castling_rights.replace('K' if status_dest == W_R else 'k', '')
+        location_to_piece[row_to, col_to] = (
+            Game.piece_for(promotion or piece, row_to, col_to) # potentially override
+        )
+        del location_to_piece[row_from, col_from] # the piece is already in its new place
+        piece_placement[row_from, col_from] = EMPTY
+        piece_placement[row_to, col_to] = promotion or piece
+        if promotion:
+            stats[piece] -= 1
+            stats[promotion] += 1
+
+        # en-passant (capture)
+        if (status_dest == EMPTY) and (piece == W_P or piece == B_P) and (col_from != col_to):
+            target_row = row_to - 1 if piece == W_P else row_to + 1
+            status_dest = piece_placement[target_row, col_to]
+            piece_placement[target_row, col_to] = EMPTY
+            assert status_dest == W_P or status_dest == B_P, f'{target_row=}, {col_from=}, {col_to=}, {status_dest=}'
+            stats[status_dest] -= 1
+            del location_to_piece[target_row, col_to]
+
+        # castling
+        is_castling = False
+        if (piece == W_K or piece == B_K) and (abs(col_from - col_to) == 2):
+            is_castling = True
+            if col_to == 6:
+                piece_placement[row_to, 5] = piece_placement[row_to, 7]
+                piece_placement[row_to, 7] = EMPTY
+                del location_to_piece[row_to, 7]
+                location_to_piece[row_to, 5] = Game.piece_for(piece_placement[row_to, 5], row_to, 5)
+            elif col_to == 2:
+                piece_placement[row_to, 3] = piece_placement[row_to, 0]
+                piece_placement[row_to, 0] = EMPTY
+                del location_to_piece[row_to, 0]
+                location_to_piece[row_to, 3] = Game.piece_for(piece_placement[row_to, 3], row_to, 3)
+            else:
+                assert False, f'{col_to=}'
+
+        en_passant = '-' # for next turn
+        if (
+            (piece == W_P and (row_from == 1) and (row_to == 3))
+            or
+            (piece == B_P and (row_from == 6) and (row_to == 4))
+            ):
+            en_passant = f"{chr(ord('a') + col_from)}{3 if row_to == 3 else 6}"
+
+        # update castling for next turn
+        if piece == W_K:
+            castling_rights = castling_rights.replace('K', '')
+            castling_rights = castling_rights.replace('Q', '')
+        elif piece == B_K:
+            castling_rights = castling_rights.replace('k', '')
+            castling_rights = castling_rights.replace('q', '')
+        elif piece == W_R:
+            if col_from == 0:
+                castling_rights = castling_rights.replace('Q', '')
+            elif col_from == 7:
+                castling_rights = castling_rights.replace('K', '')
+        elif piece == B_R:
+            if col_from == 0:
+                castling_rights = castling_rights.replace('q', '')
+            elif col_from == 7:
+                castling_rights = castling_rights.replace('k', '')
+        if len(castling_rights) < 1:
+            castling_rights = '-'
+
+        g = Game(
+            other,
+            castling_rights,
+            en_passant,
+            half_moves,
+            next_move_number,
+            stats,
+            piece_placement,
+            location_to_piece,
+        )
+
+        # g._verify()
+
+        # is it a valid game/board?
+        if g._is_check(which_king=self.board.turn):
+            assert not is_castling # because I believe I've already verified there
+            # we either did not protect the king, or have exposed it
+            return None # it is not, that move should not be considered
+
+        return g
+
+    def available_moves(self) -> Generator[Tuple[str, Game], None, None]:
+        for move in self._available_moves():
+
+            g = self._verify_move(move)
 
             row_from, col_from, row_to, col_to, piece, promotion = move
             move_formated = (
                 f'{chr(ord("a") + col_from)}{row_from + 1}{chr(ord("a") + col_to)}{row_to + 1}{promotion or ""}'
             )
-
-            if piece == W_P or piece == B_P:
-                half_moves = 0 # a Pawn made a move
-
-            status_dest = self.board.piece_placement[row_to, col_to]
-            if status_dest != EMPTY:
-                stats[status_dest] -= 1
-                half_moves = 0 # a capture
-                # Rook was eaten - potentially before attempt to castling.
-                if status_dest == W_R or status_dest == B_R:
-                    if col_to == 0:
-                        castling_rights = castling_rights.replace('Q' if status_dest == W_R else 'q', '')
-                    elif col_to == 7:
-                        castling_rights = castling_rights.replace('K' if status_dest == W_R else 'k', '')
-            location_to_piece[row_to, col_to] = (
-                Game.piece_for(promotion or piece, row_to, col_to) # potentially override
-            )
-            del location_to_piece[row_from, col_from] # the piece is already in its new place
-            piece_placement[row_from, col_from] = EMPTY
-            piece_placement[row_to, col_to] = promotion or piece
-            if promotion:
-                stats[piece] -= 1
-                stats[promotion] += 1
-
-            # en-passant (capture)
-            if (status_dest == EMPTY) and (piece == W_P or piece == B_P) and (col_from != col_to):
-                target_row = row_to - 1 if piece == W_P else row_to + 1
-                status_dest = piece_placement[target_row, col_to]
-                piece_placement[target_row, col_to] = EMPTY
-                assert status_dest == W_P or status_dest == B_P, f'{target_row=}, {col_from=}, {col_to=}, {status_dest=}'
-                stats[status_dest] -= 1
-                del location_to_piece[target_row, col_to]
-
-            # castling
-            is_castling = False
-            if (piece == W_K or piece == B_K) and (abs(col_from - col_to) == 2):
-                is_castling = True
-                if col_to == 6:
-                    piece_placement[row_to, 5] = piece_placement[row_to, 7]
-                    piece_placement[row_to, 7] = EMPTY
-                    del location_to_piece[row_to, 7]
-                    location_to_piece[row_to, 5] = Game.piece_for(piece_placement[row_to, 5], row_to, 5)
-                elif col_to == 2:
-                    piece_placement[row_to, 3] = piece_placement[row_to, 0]
-                    piece_placement[row_to, 0] = EMPTY
-                    del location_to_piece[row_to, 0]
-                    location_to_piece[row_to, 3] = Game.piece_for(piece_placement[row_to, 3], row_to, 3)
-                else:
-                    assert False, f'{col_to=}'
-
-            en_passant = '-' # for next turn
-            if (
-                (piece == W_P and (row_from == 1) and (row_to == 3))
-                or
-                (piece == B_P and (row_from == 6) and (row_to == 4))
-                ):
-                en_passant = f"{chr(ord('a') + col_from)}{3 if row_to == 3 else 6}"
-
-            # update castling for next turn
-            if piece == W_K:
-                castling_rights = castling_rights.replace('K', '')
-                castling_rights = castling_rights.replace('Q', '')
-            elif piece == B_K:
-                castling_rights = castling_rights.replace('k', '')
-                castling_rights = castling_rights.replace('q', '')
-            elif piece == W_R:
-                if col_from == 0:
-                    castling_rights = castling_rights.replace('Q', '')
-                elif col_from == 7:
-                    castling_rights = castling_rights.replace('K', '')
-            elif piece == B_R:
-                if col_from == 0:
-                    castling_rights = castling_rights.replace('q', '')
-                elif col_from == 7:
-                    castling_rights = castling_rights.replace('k', '')
-            if len(castling_rights) < 1:
-                castling_rights = '-'
-
-            g = Game(
-                other,
-                castling_rights,
-                en_passant,
-                half_moves,
-                next_move_number,
-                stats,
-                piece_placement,
-                location_to_piece,
-            )
-
-            # g._verify()
-
-            # is it a valid game/board?
-            if g._is_check(which_king=self.board.turn):
-                assert not is_castling # because I believe I've already verified there
-                # we either did not protect the king, or have exposed it
-                continue # it is not, that move should not be considered
 
             yield move_formated, g
 

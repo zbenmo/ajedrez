@@ -1,4 +1,4 @@
-from .ajedrez import Game
+from .turbo_ajedrez import Game
 
 
 def test_en_passant():
