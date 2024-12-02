@@ -355,16 +355,14 @@ class Game:
             case 'k' | 'K':
                 return King((row, col), piece)
 
-    def make_specific_move(self, move_to_take: Tuple[int, int, int, int, str, str]) -> Game:
+    def make_specific_move(self, move_to_take: Tuple[int, int, int, int, str, str]) -> Game | None:
         for move in self._available_moves():
             if move != move_to_take:
                 continue
             g = self._verify_move(move)
             if g:
                 return g
-            else:
-                assert False, f"{move_to_take=}"
-        assert False, f"{move_to_take=}"
+        return None
 
     def _available_moves(self) -> Generator[Tuple[int, int, int, int, str, str], None, None]:
         yield from itertools.chain(
@@ -391,7 +389,7 @@ class Game:
             stats[status_dest] -= 1
             half_moves = 0 # a capture
             # Rook was eaten - potentially before attempt to castling.
-            if status_dest == W_R or status_dest == B_R:
+            if (status_dest == W_R and row_to == 0) or (status_dest == B_R and row_to == 7):
                 if col_to == 0:
                     castling_rights = castling_rights.replace('Q' if status_dest == W_R else 'q', '')
                 elif col_to == 7:
@@ -447,12 +445,12 @@ class Game:
         elif piece == B_K:
             castling_rights = castling_rights.replace('k', '')
             castling_rights = castling_rights.replace('q', '')
-        elif piece == W_R:
+        elif piece == W_R and row_from == 0:
             if col_from == 0:
                 castling_rights = castling_rights.replace('Q', '')
             elif col_from == 7:
                 castling_rights = castling_rights.replace('K', '')
-        elif piece == B_R:
+        elif piece == B_R and row_from == 7:
             if col_from == 0:
                 castling_rights = castling_rights.replace('q', '')
             elif col_from == 7:
@@ -586,9 +584,7 @@ class Game:
                 and self.board.piece_placement[row, 1] == EMPTY
             ):
                 if (
-                    not self._is_treatened_by((row, 3), other)
-                    and not self._is_treatened_by((row, 2), other)
-                    and not self._is_treatened_by((row, 1), other)
+                    not self._is_treatened_by((row, 3), other) and not self._is_treatened_by((row, 2), other)
                 ):
                     yield row, 4, row, 2, king, None
 
