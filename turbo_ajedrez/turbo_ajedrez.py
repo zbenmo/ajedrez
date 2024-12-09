@@ -484,6 +484,9 @@ class Game:
 
             g = self._verify_move(move)
 
+            if not g:
+                continue
+
             row_from, col_from, row_to, col_to, piece, promotion = move
             move_formated = (
                 f'{chr(ord("a") + col_from)}{row_from + 1}{chr(ord("a") + col_to)}{row_to + 1}{promotion or ""}'
