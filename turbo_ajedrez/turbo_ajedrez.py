@@ -223,7 +223,6 @@ class Board:
     en_passant: str
     half_moves: int
     move_number: int
-    stats: Dict[str, int] # how many of each piece are there. There might be some extra stuff there
     piece_placement: Matrix # 'np.array'
     location_to_piece: Dict[Square, Piece]
 
@@ -233,10 +232,11 @@ class Board:
             'n': 3.0,
             'b': 3.0,
             'r': 5.0,
-            'q': 8.0,
+            'q': 9.0,
         }
         white, black = 0., 0.
-        for piece, count in self.stats.items():
+        stats = Counter(p.piece for p in self.location_to_piece.values())
+        for piece, count in stats.items():
             if piece.islower():
                 black += vals.get(piece, 0) * count
             else:
@@ -254,7 +254,6 @@ class Game:
         en_passant: str,
         half_moves: int,
         move_number: int,
-        stats: Dict[str, int],
         piece_placement: Matrix, #'np.array',
         location_to_piece: Dict[Square, Piece]
         ):
@@ -264,7 +263,6 @@ class Game:
             en_passant=en_passant,
             half_moves=half_moves,
             move_number=move_number,
-            stats=stats,
             piece_placement=piece_placement,
             location_to_piece=location_to_piece
         )
@@ -329,7 +327,6 @@ class Game:
             en_passant=en_passant,
             half_moves=int(half_moves),
             move_number=int(move_number),
-            stats=Counter(position),
             piece_placement=piece_placement,
             location_to_piece={
                 (row, col): cls.piece_for(piece_placement[row, col], row, col)
@@ -371,7 +368,6 @@ class Game:
     def _verify_move(self, move: Tuple[int, int, int, int, str, str]) -> Game:
         other = "w" if self.board.turn == "b" else "b"
         next_move_number = self.board.move_number if other == "b" else self.board.move_number + 1
-        stats = self.board.stats.copy()
         piece_placement = self.board.piece_placement.copy()
         location_to_piece = self.board.location_to_piece.copy()
         castling_rights = self.board.castling_rights
@@ -386,7 +382,6 @@ class Game:
 
         status_dest = self.board.piece_placement[row_to, col_to]
         if status_dest != EMPTY:
-            stats[status_dest] -= 1
             half_moves = 0 # a capture
             # Rook was eaten - potentially before attempt to castling.
             if (status_dest == W_R and row_to == 0) or (status_dest == B_R and row_to == 7):
@@ -400,9 +395,6 @@ class Game:
         del location_to_piece[row_from, col_from] # the piece is already in its new place
         piece_placement[row_from, col_from] = EMPTY
         piece_placement[row_to, col_to] = promotion or piece
-        if promotion:
-            stats[piece] -= 1
-            stats[promotion] += 1
 
         # en-passant (capture)
         if (status_dest == EMPTY) and (piece == W_P or piece == B_P) and (col_from != col_to):
@@ -410,7 +402,6 @@ class Game:
             status_dest = piece_placement[target_row, col_to]
             piece_placement[target_row, col_to] = EMPTY
             assert status_dest == W_P or status_dest == B_P, f'{target_row=}, {col_from=}, {col_to=}, {status_dest=}'
-            stats[status_dest] -= 1
             del location_to_piece[target_row, col_to]
 
         # castling
@@ -464,7 +455,6 @@ class Game:
             en_passant,
             half_moves,
             next_move_number,
-            stats,
             piece_placement,
             location_to_piece,
         )
