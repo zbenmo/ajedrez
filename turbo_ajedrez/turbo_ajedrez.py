@@ -463,7 +463,7 @@ class Game:
 
         # is it a valid game/board?
         if g._is_check(which_king=self.board.turn):
-            assert not is_castling # because I believe I've already verified there
+            # assert not is_castling # because I believe I've already verified there - not true as Pawn may treat the space
             # we either did not protect the king, or have exposed it
             return None # it is not, that move should not be considered
 

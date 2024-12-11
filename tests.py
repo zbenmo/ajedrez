@@ -1,4 +1,4 @@
-from .turbo_ajedrez import Game
+from turbo_ajedrez import Game
 
 
 def test_en_passant():
@@ -77,6 +77,29 @@ def test_8():
 
 def test_9():
     game = Game.from_fen('r1b1kb1r/p2ppppp/n7/q1pPB2n/4N3/1p6/P2QPPPP/R3KBNR b KQkq - 1 9')
+    # list(game.available_moves())
+    moves_to_game = dict(game.available_moves())
+
+    # moves = list(moves_to_game)
+
+    def get_value(game):
+        me, they = game.board.simple_heuristic()
+        return me - they
+            
+    stat = {}
+    for m, g in moves_to_game.items():
+        try:
+            counts = []
+            for m_o, g_o in g.available_moves():
+                counts.append(get_value(g_o))
+            stat[m] = min(counts)
+        except:
+            print(f"{m=}")
+            raise
+    assert len(max(stat, key=stat.get)) > 0 # ?
+
+def test_10():
+    game = Game.from_fen('rnbqk1nr/p3bppp/2p1p3/3pP3/3P4/2p1BP1N/PPP2QPP/R3KB1R b KQkq - 1 9')
     # list(game.available_moves())
     moves_to_game = dict(game.available_moves())
 
